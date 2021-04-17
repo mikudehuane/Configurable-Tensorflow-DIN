@@ -11,8 +11,6 @@ DEFAULT_SEQ_LEN = 50
 
 """Features Configuration
 
-Please use a OrderedDict object to ensure the iteration order is maintained in different scripts.
-
 To switch to another dataset and model structure, we only need to rewrite the configuration, following the rules:
     'shape': shape of the input tensor without the batch dim, 
         e.g., shape = (2,), then data with shape (batch_size, 2) will be fed into the model
@@ -31,7 +29,7 @@ To switch to another dataset and model structure, we only need to rewrite the co
         each sequence corresponds a mask input named 'mask/${seq_name}', 
         and will be coupled with an independent attention layer
 """
-FEA_CONFIG = OrderedDict({
+_FEA_CONFIG = {
     'user_id': {
         'shape': (1,),
         'category': 'emb_vec',
@@ -59,18 +57,26 @@ FEA_CONFIG = OrderedDict({
         'emb_shape': (4815, EMB_DIM),
         'seq_name': 'his_click'
     }
-})
+}
+
+
+# data file columns should follow this order: label,*_fea_config_order
+_fea_config_order = ('user_id', 'good_id', 'category_id', 'his_good_id', 'his_category_id')
+
+# although python>=3.7 dict is ordered by default, to compat lower python version, use an OrderDict object here
+FEA_CONFIG = OrderedDict()
+for key in _fea_config_order:
+    FEA_CONFIG[key] = _FEA_CONFIG[key]
+
 
 """Configuration of which inputs share the embedding
 
 format: embedding_name -> (input1, input2, ...)
 """
-SHARED_EMB_CONFIG = OrderedDict({
+SHARED_EMB_CONFIG = {
     'good_emb': ('good_id', 'his_good_id'),
     'category_emb': ('category_id', 'his_category_id')
-})
+}
 
 if not isinstance(FEA_CONFIG, OrderedDict):
     raise AssertionError('FEA_CONFIG not an OrderedDict object')
-if not isinstance(SHARED_EMB_CONFIG, OrderedDict):
-    raise AssertionError('SHARED_EMB_CONFIG not an OrderedDict object')
