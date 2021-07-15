@@ -5,7 +5,8 @@
 # @Software: PyCharm
 
 
-__all__ = ['Din', 'din_utils']
+__all__ = ['Din', 'DataInputFn', 'EmptyDatasetError', 'DataGenerator', 'ShuffleReader']
 
 from .scripts.model import Din
-from .scripts.model import utils as din_utils
+from .scripts.model.utils import DataInputFn, EmptyDatasetError
+from .scripts.data import DataGenerator, ShuffleReader

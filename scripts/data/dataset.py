@@ -20,17 +20,23 @@ _logger = logging.getLogger('data.dataset')
 class DataReader(object):
     """data reader
 
+    Input data file should obey the following rules:
+    - First column is label, 0 for False, 1 for True
+    - The following columns' order is consistent with the order in the par passed to __init__(config=OrderedDict)
+    - Sequence input should be split by space
+
     Args:
         source_fp: source data file path
         config: feature configuration
 
     Notes:
-        max user id: 49022
-        number of user: 49022
-        max good id: 143533
-        number of good: 143533
-        max category id: 4814
-        number of categories: 4814
+        For the sample dataset, meta information is as follows:
+            max user id: 49022
+            number of user: 49022
+            max good id: 143533
+            number of good: 143533
+            max category id: 4814
+            number of categories: 4814
     """
     def __init__(self, source_fp, *, config=FEA_CONFIG):
         self.source_fp = source_fp
@@ -45,6 +51,17 @@ class DataReader(object):
             self._reader = None
 
     def read(self, size=1):
+        """
+
+        Args:
+            size: how many rows to be read
+
+        Returns: A 2d array
+            - Each row is one sample
+            - Columns order is label, (same order with config)
+            - All elements are cast into int TODO(islander): support float for val
+
+        """
         if self.is_no_data_left():
             raise EOFError('Reader reaches EOF.')
 
