@@ -5,6 +5,7 @@
 # @Software: PyCharm
 
 
-__all__ = ['Din']
+__all__ = ['Din', 'din_utils']
 
 from .scripts.model import Din
+from .scripts.model import utils as din_utils
