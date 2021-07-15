@@ -3,23 +3,20 @@
 # @Author  : islander
 # @File    : train_vanilla_loop.py
 # @Software: PyCharm
-import argparse
-from pprint import pprint
-
-from tensorflow.python.platform import gfile
-
-import data
-import model
-import tensorflow as tf
-import os.path as osp
-
-import common
-
-
-import train
 
 
 def main():
+    # entry test script, absolute import project modules
+    import tensorflow as tf
+    # noinspection PyUnresolvedReferences
+    import data
+    # noinspection PyUnresolvedReferences
+    import model
+    # noinspection PyUnresolvedReferences
+    import common
+    # noinspection PyUnresolvedReferences
+    import train
+
     metric_dict = {
         'auc': train.metrics.auc,
         'accuracy': train.metrics.accuracy,

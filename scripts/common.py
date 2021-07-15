@@ -4,16 +4,14 @@
 # @File    : config.py
 # @Software: PyCharm
 
-# this file config variables that are likely to be referenced among all scripts
-
-
-import config
 import os.path as osp
 
+project_fd = osp.normpath(osp.join(__file__, '..', '..'))  # 项目根目录
+
 # directory where the data are
-data_fd = osp.join(config.project_fd, 'data')
+data_fd = osp.join(project_fd, 'data')
 train_data_fp = osp.join(data_fd, 'train.csv')
 test_data_fp = osp.join(data_fd, 'test.csv')
 
 # directory to save the running log, checkpoints, etc.
-log_fd = osp.join(config.project_fd, 'log')
+log_fd = osp.join(project_fd, 'log')

@@ -29,11 +29,7 @@ and the model can construct the computation graph automatically.
     ```shell script
     python data/generate_samples.py
     ```
-2. Create config.py under scrips/ to specify your project absolute path, e.g.,
-    ```python
-    project_fd = '/root/din/'
-    ```
-3. Run scripts/train_din.py to start the training process:
+2. Run scripts/train_din.py to start the training process:
     ```shell script
     python scripts/train_din.py
     ```

@@ -6,14 +6,12 @@
 
 
 import random
-import os.path as osp
-import logging
 
 import numpy as np
 from tensorflow.python.platform import gfile
 import logging
 
-from .fea_config import DEFAULT_SEQ_LEN, FEA_CONFIG
+from .fea_config import FEA_CONFIG
 
 
 _logger = logging.getLogger('data.dataset')

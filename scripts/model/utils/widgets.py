@@ -3,7 +3,6 @@
 # @Author  : islander
 # @File    : widgets.py
 # @Software: PyCharm
-from pprint import pprint
 
 import tensorflow as tf
 from .constant import *

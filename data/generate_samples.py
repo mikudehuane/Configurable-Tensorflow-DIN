@@ -3,11 +3,11 @@
 # @Author  : islander
 # @File    : generate_samples.py
 # @Software: PyCharm
-from collections import OrderedDict
 
-import _add_scripts_path1
+"""A tool script for generating test samples
+"""
 
-import data
+from ..scripts import data
 import random
 import numpy as np
 

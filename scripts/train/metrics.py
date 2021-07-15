@@ -16,7 +16,7 @@ metric(y_true: np.ndarray, y_pred: np.ndarray, meta_dict: Dict[str, Any])
   meta_dict: other data required to compute this metric, e.g., clients for gauc
 """
 
-from typing import Dict, Tuple, List, Any
+from typing import Dict, Any
 
 import sklearn.metrics
 import numpy as np

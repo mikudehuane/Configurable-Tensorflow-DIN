@@ -7,8 +7,6 @@ from typing import List
 
 from . import constant
 import tensorflow as tf
-from pprint import pprint
-import numpy as np
 
 
 def omit_batch_size(shape):
