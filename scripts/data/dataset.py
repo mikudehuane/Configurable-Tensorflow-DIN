@@ -261,13 +261,18 @@ class DataGenerator(object):
             for (feat_name, config), entry in zip(self._config.items(), row[1:]):
                 category = config['category']
                 shape = config['shape']
-                entry = np.array(entry)  # entry can be a scalar
                 if category.endswith('_seq'):
-                    entry = entry.reshape(-1, *shape[1:])  # first dimension (seq_len for seq unknown)
-                    his_len = entry.shape[0]
-                    if his_len > shape[0]:  # sequence too long
-                        entry = entry[:shape[0]]
-                    features[feat_name][index, :his_len] = entry
+                    # length of the sequence
+                    his_len = len(entry)
+
+                    # fill the data
+                    for seq_idx, entry_item in enumerate(entry):
+                        # entry_item can be a scalar, force into an array
+                        entry_item = np.array(entry_item)
+                        entry_item = entry_item.reshape(-1)
+                        # discard over-long entry_item
+                        entry_item = entry_item[:shape[1]]
+                        features[feat_name][index, seq_idx, :len(entry_item)] = entry_item
 
                     seq_name = config['seq_name']
                     if not mask_write[seq_name]:
@@ -275,8 +280,10 @@ class DataGenerator(object):
                 else:
                     # non-seq inputs are shaped into an 1-d array,
                     # shape can be uncertain, e.g., for a category input, with multiple categories
+                    entry = np.array(entry)  # entry can be a scalar, force into an np.array
                     entry = entry.reshape(-1)
-                    features[feat_name][index, :] = entry[: shape[0]]
+                    entry = entry[:shape[0]]  # discard over-long features
+                    features[feat_name][index, :len(entry)] = entry
 
         complete_features = dict()
         for name, value in features.items():
