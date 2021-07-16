@@ -3,7 +3,7 @@
 # @Author  : islander
 # @File    : evaluate.py
 # @Software: PyCharm
-
+from copy import deepcopy
 
 import tensorflow as tf
 from typing import Dict
@@ -40,10 +40,22 @@ def evaluate(graph: tf.Graph, sess: tf.Session,
     Returns: dict with the following content
         - outputs.keys() -> outputs.values()
         - capture_feat_names -> features[feat_name]
+
+    Notes:
+        - if scalar (such as loss) appears in outputs.values, it will be added into the return value
+            when input_fn is not empty, but will be missing otherwise
+        - if the dataset is empty, we do not know the shape of features, so outputs specified in capture_feat_names
+            will all be reshaped into (0, 1)
+
+    Raises:
+        RuntimeError: when 'train_op' appears in outputs (suggest a training graph)
     """
     with graph.as_default():
+        if 'train_op' in outputs:
+            raise RuntimeError('Attempt to evaluate on a training graph, this may mistakenly update the model')
+
         whole_outputs = dict()  # put return values
-        for step, (features, labels) in enumerate(input_fn()):
+        for step, (features, labels) in enumerate(input_fn(reset=False)):
             if test_steps is not None and step >= test_steps:
                 break
 
@@ -52,24 +64,28 @@ def evaluate(graph: tf.Graph, sess: tf.Session,
             feed_dict[label_ph] = labels
             # do computation
             outputs_ = sess.run(outputs, feed_dict=feed_dict)
+            output_keys = list(outputs_.keys())
             for feat_name in capture_feat_names:
+                if feat_name in outputs_:  # key conflict
+                    raise ValueError('Given capture_feat_names={} conflict the keys of model outputs {}'.format(
+                        capture_feat_names, output_keys))
                 outputs_[feat_name] = features[feat_name]
 
             # fill outputs into return values
             for key, value in outputs_.items():
-                if key not in whole_outputs:
-                    whole_outputs[key] = []
                 try:
-                    value = list(value)
+                    value = list(value)  # this may raise error when scalar given, in this case, skip
+                    if key not in whole_outputs:
+                        whole_outputs[key] = []
+                    whole_outputs[key].extend(value)
                 except TypeError:  # not list type, e.g., loss, skip
                     continue
-                whole_outputs[key].extend(value)
 
         # empty testset, construct placeholder outputs and return
-        if len(whole_outputs) == 0:
+        if not whole_outputs:
             for name, tensor in outputs.items():
                 shape = tensor.shape.as_list()
-                if len(shape) != 0:
+                if len(shape) != 0:  # vector outputs, else a scalar (do not add into outputs)
                     shape[0] = 0
                     tensor = np.zeros(shape)
                     whole_outputs[name] = tensor
