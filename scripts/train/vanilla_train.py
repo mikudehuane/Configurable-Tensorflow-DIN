@@ -20,7 +20,7 @@ def train(
         sess: tf.Session,
         fea_ph: Dict[str, tf.Tensor], label_ph: tf.Tensor, outputs: Dict[str, tf.Tensor],
         input_fn,
-        train_steps,
+        train_steps=None,
         verbose=False
 ):
     """train model by input_fn, without any log or checkpoint
@@ -31,7 +31,7 @@ def train(
         fea_ph: feature input placeholder of the computation graph
         label_ph: label input placeholder of the computation graph
         outputs: dict of output nodes in the computation graph
-        train_steps: maximum training steps
+        train_steps: maximum training steps, by default train until input_fn ends
         verbose: whether to print progress
 
     Returns:
@@ -50,7 +50,7 @@ def train(
         if verbose:
             if steps_count % 100 == 0:
                 print('{} steps passed'.format(steps_count))
-        if steps_count >= train_steps:
+        if train_steps is not None and steps_count >= train_steps:
             break
 
     if steps_count == 0:

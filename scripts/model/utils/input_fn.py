@@ -16,16 +16,9 @@ def omit_batch_size(shape):
 
 def get_batch(data_iter):
     try:
-        feat_dict, mask_dict, labels = data_iter.__next__()
+        features, labels = data_iter.__next__()
     except StopIteration:
         return None
-    features = dict()
-    for feat_name, feature in feat_dict.items():
-        new_feat_name = constant.FEATURE_SEPARATOR.join([constant.FeaturePrefix.FEAT, feat_name])
-        features[new_feat_name] = feature
-    for seq_name, mask in mask_dict.items():
-        new_feat_name = constant.FEATURE_SEPARATOR.join([constant.FeaturePrefix.MASK, seq_name])
-        features[new_feat_name] = mask
 
     # squeeze verbose dimension of labels
     if len(labels.shape) != 1:
@@ -55,20 +48,13 @@ class DataInputFn(object):
         data_gen_kwargs: dict of args to be fed to the call of data_gen, e.g. dict(mode='test')
     """
 
-    def __init__(self, data_gen, data_gen_kwargs):
+    def __init__(self, data_gen, data_gen_kwargs=None):
         self._data_gen = data_gen
+        data_gen_kwargs = dict() if data_gen_kwargs is None else data_gen_kwargs
         self._data_gen_kwargs = data_gen_kwargs
 
-    def __call__(self, require='dataset'):
-        """wrap the input function
-
-        Args:
-            require:
-              - dataset: return the dataset used for estimator
-              - generator: return the data generator
-
-        Returns:
-            replies on <require> arg
+    def __call__(self):
+        """wrap the input function into an input_fn for estimator API
         """
         tf.logging.debug('input_fn called')
         data_iter = self._data_gen(**self._data_gen_kwargs)
@@ -93,10 +79,4 @@ class DataInputFn(object):
                 else:
                     yield batch
 
-        if require == 'dataset':
-            return tf.data.Dataset.from_generator(data_gen_wrapper,
-                                                  output_types=output_dtypes, output_shapes=output_shapes)
-        elif require == 'generator':
-            return data_gen_wrapper()
-        else:
-            raise ValueError('require is expected to be one of (dataset, generator), but got %s' % require)
+        return tf.data.Dataset.from_generator(data_gen_wrapper, output_types=output_dtypes, output_shapes=output_shapes)
