@@ -207,6 +207,8 @@ class DataGenerator(object):
     Args:
         reader: data reader
         batch_size: batch size
+        config: input config
+            - sequences will be cut to the target length in config
     """
 
     def __init__(self, reader, *, config=FEA_CONFIG, batch_size=1024):
@@ -237,13 +239,14 @@ class DataGenerator(object):
         if batch_size == 0:
             raise ValueError('batch size should not be zero')
 
+        # create numpy placeholders for the inputs
         labels = np.zeros((batch_size,), dtype=np.int32)
         features = dict()
         masks = dict()
         for feat_name, config in self._config.items():
             shape = (batch_size, *config['shape'])
             dtype = np.int32 if config['category'].startswith('emb_') else np.float32
-            features[feat_name] = np.zeros(shape=shape, dtype=dtype)
+            features[feat_name] = np.full(shape=shape, dtype=dtype, fill_value=config.get('default_val', 0))
 
             if config['category'].endswith('_seq'):
                 seq_name = config['seq_name']
@@ -258,9 +261,9 @@ class DataGenerator(object):
             for (feat_name, config), entry in zip(self._config.items(), row[1:]):
                 category = config['category']
                 shape = config['shape']
-                entry = np.array(entry)
-                entry = entry.reshape(-1, *shape[1:])  # first dimension (seq_len for seq unknown)
+                entry = np.array(entry)  # entry can be a scalar
                 if category.endswith('_seq'):
+                    entry = entry.reshape(-1, *shape[1:])  # first dimension (seq_len for seq unknown)
                     his_len = entry.shape[0]
                     if his_len > shape[0]:  # sequence too long
                         entry = entry[:shape[0]]
@@ -269,9 +272,11 @@ class DataGenerator(object):
                     seq_name = config['seq_name']
                     if not mask_write[seq_name]:
                         masks[seq_name][index, :his_len] = 1
-
                 else:
-                    features[feat_name][index, :] = entry
+                    # non-seq inputs are shaped into an 1-d array,
+                    # shape can be uncertain, e.g., for a category input, with multiple categories
+                    entry = entry.reshape(-1)
+                    features[feat_name][index, :] = entry[: shape[0]]
 
         complete_features = dict()
         for name, value in features.items():

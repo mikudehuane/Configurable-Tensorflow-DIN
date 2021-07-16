@@ -28,6 +28,7 @@ To switch to another dataset and model structure, we only need to rewrite the co
         this key is used to support multiple sequences, e.g., purchasing history and browsing history,
         each sequence corresponds a mask input named 'mask/${seq_name}', 
         and will be coupled with an independent attention layer
+    'default_val': when filling placeholder values (e.g., for sequence masking), the value to be filled, by default is 0
 """
 _FEA_CONFIG = {
     'user_id': {
