@@ -38,12 +38,10 @@ def evaluate(graph: tf.Graph, sess: tf.Session,
         capture_feat_names: keys in features, which will be added into return values
 
     Returns: dict with the following content
-        - outputs.keys() -> outputs.values()
+        - outputs.keys() -> outputs.values(), discard scalars
         - capture_feat_names -> features[feat_name]
 
     Notes:
-        - if scalar (such as loss) appears in outputs.values, it will be added into the return value
-            when input_fn is not empty, but will be missing otherwise
         - if the dataset is empty, we do not know the shape of features, so outputs specified in capture_feat_names
             will all be reshaped into (0, 1)
 
