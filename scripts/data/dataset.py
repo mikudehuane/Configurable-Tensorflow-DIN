@@ -265,6 +265,8 @@ class DataGenerator(object):
                     # length of the sequence
                     his_len = len(entry)
 
+                    entry = entry[:shape[0]]  # cut too long sequence
+
                     # fill the data
                     for seq_idx, entry_item in enumerate(entry):
                         # entry_item can be a scalar, force into an array
