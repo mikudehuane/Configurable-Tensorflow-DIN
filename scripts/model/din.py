@@ -259,7 +259,6 @@ class Din(object):
             this method will attempt to find the variable named learning_rate in self.graph,
             so when building graph, the optimizer should be passed with a function which create lr as a variable inside
         """
-        _logger.warning('change_lr currently only supports SGD')
         with self.graph.as_default():
             with tf.variable_scope('', reuse=True):
                 learning_rate = tf.get_variable('learning_rate')
