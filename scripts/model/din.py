@@ -9,6 +9,9 @@ import tensorflow as tf
 from . import layers
 from .utils import *
 from . import utils
+import logging
+
+_logger = logging.getLogger('model.din')
 
 
 class NetNotBuiltError(Exception):
@@ -246,6 +249,22 @@ class Din(object):
             emb_name2feat_name[emb_name] = feat_name
         return emb_name2feat_name
 
+    def set_lr(self, new_lr):
+        """change the learning rate of the current graph
+
+        Args:
+            new_lr: new learning rate
+
+        Notes:
+            this method will attempt to find the variable named learning_rate in self.graph,
+            so when building graph, the optimizer should be passed with a function which create lr as a variable inside
+        """
+        _logger.warning('change_lr currently only supports SGD')
+        with self.graph.as_default():
+            with tf.variable_scope('', reuse=True):
+                learning_rate = tf.get_variable('learning_rate')
+                learning_rate.load(new_lr, self.session)
+
     def build_graph_(self, key, *,
                      mode, device='gpu', optimizer=None, seed=None):
         """build the graph in self, and initializing pars with random values
@@ -255,7 +274,10 @@ class Din(object):
             device: 'cpu' or 'gpu'
             key: indicator for the current graph, when switch mode, will use the key
                 suggested to be set to 'train' and 'eval'
-            optimizer: optimizer for the model, None means do not build the optimization part
+            optimizer: optimizer for the model, can be the following
+                - tf.train.Optimizer object
+                - None (means do not build the optimization part)
+                - Callable object returning a tf.train.Optimizer (this is useful to create lr as a variable)
             seed: random seed for graph initialization
         """
         graph = tf.Graph()
@@ -263,6 +285,9 @@ class Din(object):
             if seed is not None:
                 tf.random.set_random_seed(seed)
             with tf.device(device):
+                if callable(optimizer):
+                    optimizer = optimizer()
+
                 # generate input placeholders
                 features_ph, labels_ph = utils.get_inputs_ph(input_config=self._input_config_raw, batch_size=None)
                 outputs = self.build_graph(features=features_ph, labels=labels_ph, mode=mode,
