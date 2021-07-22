@@ -2,7 +2,7 @@
 # @Time    : 2020/11/24 17:51
 # @Author  : islander
 # @File    : model.py
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import tensorflow as tf
 
@@ -32,7 +32,8 @@ class Din(object):
         forward_net: layers.AirLayer
             forward net producing score (CTR is the softmaxed score)
         required_feat_names: keys in features passed to the build_net func, by default, [].
-            for each registered feat, the model will map the input to a named input via identity.
+            - if given as a List, for each registered feat, the model will map the input to a named input via identity.
+            - if given as a Dict, map the key to the feat corresponding to the value
 
     Attributes:
         tensor_name_dict: maps keys in features to the tensorflow name in the computation graph,
@@ -67,7 +68,7 @@ class Din(object):
     """
 
     def __init__(self, input_config: Dict, shared_emb_config=None, attention_layers=None, forward_net=None,
-                 required_feat_names: List[str] = None,
+                 required_feat_names: Union[List[str], Dict[str, str]] = None,
                  **kwargs):
         super().__init__()
 
@@ -83,6 +84,8 @@ class Din(object):
         if required_feat_names is None:
             required_feat_names = []
         self._required_feat_names = required_feat_names
+        if not isinstance(self._required_feat_names, Dict):  # 列表转为 identity map
+            self._required_feat_names = {val: val for val in self._required_feat_names}
 
         # generate tensor_name_dict
         self.tensor_name_dict = {
@@ -90,8 +93,8 @@ class Din(object):
             'labels': 'labels',
             'loss': 'compute_loss/loss',
         }
-        for feat_name in self._required_feat_names:
-            self.tensor_name_dict[feat_name] = feat_name
+        for semantic_feat_name, feat_name in self._required_feat_names.items():
+            self.tensor_name_dict[semantic_feat_name] = feat_name
 
         # check whether the input_config and shared_emb_config is valid
         utils.check_config(input_config=input_config, shared_emb_config=shared_emb_config)
@@ -319,9 +322,9 @@ class Din(object):
 
         # name the inputs
         tf.identity(labels, name=self.tensor_name_dict['labels'])
-        for feat_name in self._required_feat_names:
+        for semantic_feat_name, feat_name in self._required_feat_names.items():
             feature = features[feat_name]
-            tf.identity(feature, name=self.tensor_name_dict[feat_name])
+            tf.identity(feature, name=self.tensor_name_dict[semantic_feat_name])
 
         ret["labels"] = labels
         ret["logits"] = self.forward(features=features, mode=mode)
