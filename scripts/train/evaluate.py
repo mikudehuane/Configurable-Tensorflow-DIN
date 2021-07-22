@@ -80,7 +80,7 @@ def evaluate(graph: tf.Graph, sess: tf.Session,
                 except TypeError:  # not list type, e.g., loss, skip
                     continue
 
-            if verbose and step % 1000 == 0:
+            if verbose and step % 100 == 0:
                 print('{} steps passed'.format(step))
 
         # empty testset, construct placeholder outputs and return
