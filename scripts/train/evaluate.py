@@ -24,10 +24,11 @@ def evaluate_by_net(net, input_fn, **kwargs):
 def evaluate(graph: tf.Graph, sess: tf.Session,
              fea_ph: Dict[str, tf.Tensor], label_ph: tf.Tensor, outputs: Dict[str, tf.Tensor],
              input_fn, *,
-             test_steps=None, capture_feat_names=()) -> Dict[str, np.ndarray]:
+             test_steps=None, capture_feat_names=(), verbose=False) -> Dict[str, np.ndarray]:
     """evaluate according to input_fn
 
     Args:
+        verbose: whether to print progress
         sess: the session to be run
         test_steps: the number of batches to be tested, None means test the whole set
         graph: the evaluation graph
@@ -78,6 +79,9 @@ def evaluate(graph: tf.Graph, sess: tf.Session,
                     whole_outputs[key].extend(value)
                 except TypeError:  # not list type, e.g., loss, skip
                     continue
+
+            if verbose and step % 1000 == 0:
+                print('{} steps passed'.format(step))
 
         # empty testset, construct placeholder outputs and return
         if not whole_outputs:
