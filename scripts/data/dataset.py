@@ -209,12 +209,19 @@ class DataGenerator(object):
         batch_size: batch size
         config: input config
             - sequences will be cut to the target length in config
+
+    Attributes:
+        reader: the wrapped reader
     """
 
     def __init__(self, reader, *, config=FEA_CONFIG, batch_size=1024):
         self._reader = reader
         self._batch_size = batch_size
         self._config = config
+
+    @property
+    def reader(self):
+        return self._reader
 
     def __call__(self, reset=True):
         """return a generator to generate samples

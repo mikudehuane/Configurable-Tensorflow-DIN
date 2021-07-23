@@ -67,6 +67,7 @@ def main():
         net.switch_graph('eval')
         net.load_from('train')
 
+        gen_test.reader.seek(0)
         model_pred_outputs = train.evaluate.evaluate_by_net(
             net=net,
             input_fn=gen_test
