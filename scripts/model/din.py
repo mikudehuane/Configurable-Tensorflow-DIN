@@ -563,18 +563,44 @@ class Din(object):
         self.freeze_forward_net()
 
     def __get_embeddings(self, feat_dict, emb_name2emb_variable):
+        """get the corresponding embedding of the coming feat_dict, embeddings will be processed according to self._input_config
+
+        Args:
+            feat_dict: feat_name -> feat_values
+            emb_name2emb_variable: the embedding dictionary
+
+        Returns:
+            the fetched embeddings
+        """
         emb_feats = dict()
         for feat_name in feat_dict:
             _feat_name = feat_name.split(constant.FEATURE_SEPARATOR)[-1]
             emb_indices = feat_dict[feat_name]
             emb_name = self._emb_dict[_feat_name]
-            emb_shape = self._input_config[feat_name][constant.InputConfigKeys.EMB_SHAPE]
+            # fetch values from feature config
+            config = self._input_config[feat_name]
+            emb_shape = config[constant.InputConfigKeys.EMB_SHAPE]
+            default_val = config.get(constant.InputConfigKeys.DEFAULT_VAL, 0)
+            emb_process = config.get(constant.InputConfigKeys.EMB_PROCESS, 'concat')
 
+            # padded values may exceed the boundaries, force those to the configed default_val
             emb_indices = utils.replace_out_of_ranges(
-                value=emb_indices, target_range=(0, emb_shape[0]), name='remove_invalid_emb_id', replace_value=0
-            )
-            embeddings = emb_name2emb_variable[emb_name]
-            emb_feat = tf.nn.embedding_lookup(embeddings, emb_indices, name=f'lookup_{_feat_name}')
+                value=emb_indices, target_range=(0, emb_shape[0]), name='remove_invalid_emb_id', replace_value=default_val)
+            embeddings = emb_name2emb_variable[emb_name]  # the embedding table for the feature
+            if emb_process == 'concat':
+                emb_feat = tf.nn.embedding_lookup(embeddings, emb_indices, name=f'lookup_{_feat_name}')
+            else:
+                assert emb_process == 'mean_skip_padding'
+                # note: if no valid idx in the group given, the embedding will be reduced to zero
+                emb_mask = tf.equal(emb_indices, default_val, name='get_non-padding_mask')  # convert to bool tensor
+                weights = tf.where(emb_mask, tf.zeros_like(emb_mask, dtype=tf.float32),
+                                   tf.ones_like(emb_mask, dtype=tf.float32), name='convert_mask2weight')  # this is to weight the embeddings shape=(*, d)
+                weights_sum = tf.reduce_sum(weights, axis=-1, name='sum_weights', keepdims=True) + 1e-7  # the number of valid entries for each embedding group shape=(*, 1)
+                weights = weights / weights_sum  # get the real weights (sum = 1)
+                weights = tf.expand_dims(weights, -1)  # expand to the same len(shape) with emb_feat
+                emb_feat = tf.nn.embedding_lookup(embeddings, emb_indices, name=f'lookup_{_feat_name}')
+                emb_feat = emb_feat * weights  # apply reduce
+                emb_feat = tf.reduce_sum(emb_feat, axis=-2, keepdims=True)  # reduce on the embedding group dim
             emb_feats[feat_name] = emb_feat
         return emb_feats
 

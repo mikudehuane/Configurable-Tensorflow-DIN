@@ -10,6 +10,8 @@ class InputConfigKeys(object):  # useful keys in each input_config
     SHAPE = 'shape'
     EMB_SHAPE = 'emb_shape'
     SEQ_NAME = 'seq_name'
+    EMB_PROCESS = 'emb_process'
+    DEFAULT_VAL = 'default_val'
 
 
 class InputCategoryPlace(object):  # attribute of categories, indicating where it is in the network
