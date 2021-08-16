@@ -65,39 +65,22 @@ class Din(ModelFrame):
     """
 
     def __init__(self, input_config: Dict, shared_emb_config=None, attention_layers=None, forward_net=None,
-                 required_feat_names: Union[List[str], Dict[str, str]] = None,
+                 required_feat_names=None,
                  **kwargs):
-        super().__init__()
+        super().__init__(required_feat_names=required_feat_names, input_config=input_config, **kwargs)
 
         # kwargs
         self._batch_norm = kwargs.pop('batch_norm', 'bn')
         self._include_his_sum = kwargs.pop('include_his_sum', True)
         self._use_moving_statistics = kwargs.pop('use_moving_statistics', True)
-        self._epsilon = kwargs.pop('epsilon', 1e-7)
         # will be override later in config
         self._use_vec = False
         self._use_seq = False
-
-        if required_feat_names is None:
-            required_feat_names = []
-        self._required_feat_names = required_feat_names
-        if not isinstance(self._required_feat_names, Dict):  # 列表转为 identity map
-            self._required_feat_names = {val: val for val in self._required_feat_names}
-
-        # generate tensor_name_dict
-        self.tensor_name_dict = {
-            'probs': 'predict/probabilities',
-            'labels': 'labels',
-            'loss': 'compute_loss/loss',
-        }
-        for semantic_feat_name, feat_name in self._required_feat_names.items():
-            self.tensor_name_dict[semantic_feat_name] = feat_name
 
         # check whether the input_config and shared_emb_config is valid
         utils.check_config(input_config=input_config, shared_emb_config=shared_emb_config)
 
         # declare index member variables
-        self._input_config_raw = input_config
         # map feature name to configurations
         # feat_name -> config
         self._input_config = utils.get_full_input_config(input_config=input_config)
@@ -157,160 +140,11 @@ class Din(ModelFrame):
         if len(kwargs) != 0:
             raise ValueError(f"Unrecognized kwargs: {kwargs}")
 
-        super().__init__()
-
-    def _get_emb_name2feat_name(self):
+    def _get_emb_name2feat_name(self):  # reverse self._emb_dict, which is feat_name -> emb_name
         emb_name2feat_name = dict()
         for feat_name, emb_name in self._emb_dict.items():
             emb_name2feat_name[emb_name] = feat_name
         return emb_name2feat_name
-
-    def set_lr(self, new_lr):
-        """change the learning rate of the current graph
-
-        Args:
-            new_lr: new learning rate
-
-        Notes:
-            this method will attempt to find the variable named learning_rate in self.graph,
-            so when building graph, the optimizer should be passed with a function which create lr as a variable inside
-        """
-        with self.graph.as_default():
-            with tf.variable_scope('', reuse=True):
-                learning_rate = tf.get_variable('learning_rate')
-                learning_rate.load(new_lr, self.session)
-
-    def build_graph_(self, key, *,
-                     mode, device='gpu', optimizer=None, seed=None):
-        """build the graph in self, and initializing pars with random values
-
-        Args:
-            mode: tf.estimator.ModeKeys.TRAIN or EVAL
-            device: 'cpu' or 'gpu'
-            key: indicator for the current graph, when switch mode, will use the key
-                suggested to be set to 'train' and 'eval'
-            optimizer: optimizer for the model, can be the following
-                - tf.train.Optimizer object
-                - None (means do not build the optimization part)
-                - Callable object returning a tf.train.Optimizer (this is useful to create lr as a variable)
-            seed: random seed for graph initialization
-        """
-        graph = tf.Graph()
-        with graph.as_default():
-            if seed is not None:
-                tf.random.set_random_seed(seed)
-            with tf.device(device):
-                if callable(optimizer):
-                    optimizer = optimizer()
-
-                # generate input placeholders
-                features_ph, labels_ph = utils.get_inputs_ph(input_config=self._input_config_raw, batch_size=None)
-                outputs = self.build_graph(features=features_ph, labels=labels_ph, mode=mode,
-                                           params={'optimizer': optimizer})
-                session_config = tf.ConfigProto(allow_soft_placement=True,
-                                                gpu_options=tf.GPUOptions(allow_growth=True))
-                session = tf.Session(config=session_config)
-                session.run(tf.global_variables_initializer())
-                saver = tf.train.Saver(max_to_keep=None)
-
-        self._features_phs[key] = features_ph
-        self._labels_phs[key] = labels_ph
-        self._outputss[key] = outputs
-        self._sessions[key] = session
-        self._graphs[key] = graph
-        self._savers[key] = saver
-
-        if self._current_graph is None:  # first graph, set current graph to this graph
-            self._current_graph = key
-
-    def build_graph(self, features: Dict[str, tf.Tensor], labels: tf.Tensor, mode, params=None):
-        """build the training graph (including optimization)
-
-        Args: the same with model_fn
-
-        Returns:
-            a dict of result tensors
-        """
-        ret = dict()
-
-        # name the inputs
-        tf.identity(labels, name=self.tensor_name_dict['labels'])
-        for semantic_feat_name, feat_name in self._required_feat_names.items():
-            feature = features[feat_name]
-            tf.identity(feature, name=self.tensor_name_dict[semantic_feat_name])
-
-        ret["labels"] = labels
-        ret["logits"] = self.forward(features=features, mode=mode)
-
-        with tf.name_scope('predict'):
-            ret["probs"] = tf.nn.softmax(ret["logits"], name="probabilities")
-            ret["classes"] = tf.argmax(input=ret["logits"], axis=1)
-
-        # Calculate Loss (for both TRAIN and EVAL modes)
-        with tf.name_scope('compute_loss'):
-            # tf.losses.sparse_softmax_cross_entropy produces strange results only in odps, seems like a bug?
-            labels_one_hot = tf.one_hot(ret["labels"], depth=ret["logits"].get_shape()[-1], name='one_hot')
-            neg_log_probs = - tf.log(ret["probs"] + self._epsilon, name='log_probabilities')
-            loss_sum = tf.reduce_sum(labels_one_hot * neg_log_probs, axis=1, name='true_label_neg_log_prob')
-            ret["loss"] = tf.reduce_mean(loss_sum, axis=0, name='loss')
-
-        # Configure the Training Op (for TRAIN mode)
-        if mode == tf.estimator.ModeKeys.TRAIN:
-            with tf.name_scope('optimize'):
-                optimizer = params.pop('optimizer')
-                optimizer: tf.train.Optimizer
-                ret['gradient'] = tf.gradients(ret["loss"], tf.trainable_variables())
-                ret['gradient'], _ = tf.clip_by_global_norm(ret['gradient'], 5)
-                ret['gradient'] = list(zip(ret['gradient'], tf.trainable_variables()))
-                train_op = optimizer.apply_gradients(
-                    ret['gradient'], global_step=tf.train.get_or_create_global_step()
-                )
-                update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-                ret["train_op"] = tf.group([train_op, update_ops])
-
-        return ret
-
-    def model_fn(self, features, labels, mode, params):
-        """model_fn for estimator
-        """
-        outputs = self.build_graph(features=features, labels=labels, mode=mode, params=params)
-
-        predictions = {
-            "classes": outputs['classes'],
-            "probs": outputs['probs'],
-        }
-
-        if mode == tf.estimator.ModeKeys.PREDICT:
-            return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
-
-        # Configure the Training Op (for TRAIN mode)
-        if mode == tf.estimator.ModeKeys.TRAIN:
-            return tf.estimator.EstimatorSpec(mode=mode, loss=outputs['loss'], train_op=outputs['train_op'])
-
-        if mode == tf.estimator.ModeKeys.EVAL:
-            with tf.name_scope('evaluate'):
-                eval_metric_ops = {
-                    "accuracy": tf.metrics.accuracy(labels=outputs['labels'], predictions=predictions['classes']),
-                }
-                if outputs['probs'].shape[1] == 2:  # only log binary aucs
-                    # use tf auc is calculated on multi-classes, but it diverges from binary auc, so have to transform
-                    true_probs = outputs['probs'][:, 1]
-                    num_thresholds = 10000
-                    eval_metric_ops.update({
-                        "auc": tf.metrics.auc(labels=outputs['labels'], predictions=true_probs, name='auc',
-                                              num_thresholds=num_thresholds, summation_method='careful_interpolation'),
-                        # lower bound of auc approximation
-                        "auc_min": tf.metrics.auc(labels=outputs['labels'], predictions=true_probs,
-                                                  num_thresholds=num_thresholds,
-                                                  summation_method='minoring', name='auc_min'),
-                        # upper bound of auc approximation
-                        "auc_max": tf.metrics.auc(labels=outputs['labels'], predictions=true_probs,
-                                                  num_thresholds=num_thresholds,
-                                                  summation_method='majoring', name='auc_max'),
-                    })
-            return tf.estimator.EstimatorSpec(mode=mode, loss=outputs['loss'], eval_metric_ops=eval_metric_ops)
-
-        raise ValueError(f'mode should be tf.estimator.ModeKeys, but got {mode}')
 
     def forward(self, features, mode):
         """forward pass and produce logits
