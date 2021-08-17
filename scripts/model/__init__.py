@@ -10,9 +10,8 @@ Notes:
         - to freeze a layer in the middle of a run, please define another graph by "with tf.Graph()",
 """
 
-__all__ = ['Din', 'utils']
-
 from . import layers
 from .din import Din
 from .utils import constant
 from . import utils
+from .model_frame import ModelFrame

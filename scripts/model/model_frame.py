@@ -3,7 +3,7 @@
 # @Author  : islander
 # @File    : ModelFrame.py
 # @Software: PyCharm
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from typing import Dict
 from . import utils
 
@@ -14,20 +14,37 @@ class NetNotBuiltError(Exception):
     pass
 
 
-class ModelFrame(object):
+class ModelFrame(ABC):
     """framework for constructing the model
 
     Args:
         required_feat_names: keys in features passed to the build_net func, by default, [].
             - if given as a List, for each registered feat, the model will map the input to a named input via identity.
             - if given as a Dict, map the key to the feat corresponding to the value
-        input_config: input configuration, reserve as member var, for generating input placeholder
+        input_config (OrderedDict): input configuration, reserve as member var, for generating input placeholder
+
+    Attributes:
+        tensor_name_dict: maps keys in features to the tensorflow name in the computation graph,
+                additionally, the following tensor names will also be added:
+                    - probs: computed probabilities
+                    - labels: true labels
+                    - loss: loss in session
+                note that this attribute will be updated in-place
+        features_ph: placeholder for the input features, if multiple graphs built, consistent with the current graph
+        labels_ph: placeholder for the labels, if multiple graphs built, consistent with the current graph
+        outputs: placeholder for the outputs, if multiple graphs built, consistent with the current graph
+        session: running session for the model, if multiple graphs built, consistent with the current graph
+        saver: checkpoint saver for the graph
+        current_graph: key of the current_graph
 
     Keyword Args:
         epsilon: arithmetic robustness
     """
     def __init__(self, input_config, required_feat_names=None, **kwargs):
         self._input_config_raw = input_config
+        # map feature name to configurations
+        # feat_name -> config
+        self._input_config = utils.get_full_input_config(input_config=input_config)
 
         self._epsilon = kwargs.pop('epsilon', 1e-7)
 
@@ -167,6 +184,7 @@ class ModelFrame(object):
             feature = features[feat_name]
             tf.identity(feature, name=self.tensor_name_dict[semantic_feat_name])
 
+        tf.train.get_or_create_global_step()
         ret["labels"] = labels
         ret["logits"] = self.forward(features=features, mode=mode)
 

@@ -28,23 +28,7 @@ class Din(ModelFrame):
             list attention layer operating seq, (each seq associated with one attention layer)
         forward_net: layers.AirLayer
             forward net producing score (CTR is the softmaxed score)
-        required_feat_names: keys in features passed to the build_net func, by default, [].
-            - if given as a List, for each registered feat, the model will map the input to a named input via identity.
-            - if given as a Dict, map the key to the feat corresponding to the value
-
-    Attributes:
-        tensor_name_dict: maps keys in features to the tensorflow name in the computation graph,
-                additionally, the following tensor names will also be added:
-                    - probs: computed probabilities
-                    - labels: true labels
-                    - loss: loss in session
-                note that this attribute will be updated in-place
-        features_ph: placeholder for the input features, if multiple graphs built, consistent with the current graph
-        labels_ph: placeholder for the labels, if multiple graphs built, consistent with the current graph
-        outputs: placeholder for the outputs, if multiple graphs built, consistent with the current graph
-        session: running session for the model, if multiple graphs built, consistent with the current graph
-        saver: checkpoint saver for the graph
-        current_graph: key of the current_graph
+        required_feat_names: see ModelFrame
 
     Keyword Args:
         batch_norm: one of: bn (batchnorm), ln (layernorm), None (do not norm)
@@ -77,13 +61,9 @@ class Din(ModelFrame):
         self._use_vec = False
         self._use_seq = False
 
+        # declare index member variables
         # check whether the input_config and shared_emb_config is valid
         utils.check_config(input_config=input_config, shared_emb_config=shared_emb_config)
-
-        # declare index member variables
-        # map feature name to configurations
-        # feat_name -> config
-        self._input_config = utils.get_full_input_config(input_config=input_config)
         # map feature name to embedding layer name (for shared embedding config)
         # feat_name -> emb_layer_name (feat_name if not in shared_emb_config else emb_name)
         self._emb_dict = dict()
@@ -152,8 +132,6 @@ class Din(ModelFrame):
         Raises:
             RuntimeError: when config parsing failed
         """
-        tf.train.get_or_create_global_step()
-
         _INPUT_PARSE_FAIL_MSG = 'failure when parsing inputs for Din'
 
         # separate inputs

@@ -29,7 +29,7 @@ To switch to another dataset and model structure, we only need to rewrite the co
         each sequence corresponds a mask input named 'mask/${seq_name}', 
         and will be coupled with an independent attention layer
     'default_val': when filling placeholder values (e.g., for sequence masking), the value to be filled, by default is 0
-    'emb_process': for embedding, after fetched, how to process it
+    'emb_process': for embedding (dense embedding or multi(one)-hot embedding), after fetched, how to process it
         concat: the default value, concat the embeddings
         mean_skip_padding: reduce the values as mean, skip those padding values (specified in default_val), e.g., (2, 3, -1, 5, -1) -> mean(emb(2), emb(3), emb(5))
 """
