@@ -171,7 +171,13 @@ class ModelFrame(ABC):
     def build_graph(self, features, labels, mode, params=None):
         """build the training graph (including optimization)
 
-        Args: the same with model_fn
+        Args:
+            mode: tf.estimator.ModeKeys.TRAIN or EVAL
+            features: input data
+            labels: label for supervising
+            params: auxiliary objects for net building
+                - optimizer: give the optimizer
+                - loss: specify the loss function
 
         Returns:
             a dict of result tensors
@@ -194,11 +200,20 @@ class ModelFrame(ABC):
 
         # Calculate Loss (for both TRAIN and EVAL modes)
         with tf.name_scope('compute_loss'):
-            # tf.losses.sparse_softmax_cross_entropy produces strange results only in odps, seems like a bug?
-            labels_one_hot = tf.one_hot(ret["labels"], depth=ret["logits"].get_shape()[-1], name='one_hot')
-            neg_log_probs = - tf.log(ret["probs"] + self._epsilon, name='log_probabilities')
-            loss_sum = tf.reduce_sum(labels_one_hot * neg_log_probs, axis=1, name='true_label_neg_log_prob')
-            ret["loss"] = tf.reduce_mean(loss_sum, axis=0, name='loss')
+            loss_func = params.get("loss", 'cross_entropy')
+            if loss_func == 'cross_entropy':
+                labels_one_hot = tf.one_hot(ret["labels"], depth=ret["logits"].get_shape()[-1], name='one_hot')
+                neg_log_probs = - tf.log(ret["probs"] + self._epsilon, name='log_probabilities')
+                loss_sum = tf.reduce_sum(labels_one_hot * neg_log_probs, axis=1, name='true_label_neg_log_prob')
+                ret["loss"] = tf.reduce_mean(loss_sum, axis=0, name='loss')
+            elif loss_func == 'square':
+                labels_one_hot = tf.one_hot(ret["labels"], depth=ret["logits"].get_shape()[-1], name='one_hot', dtype=tf.float32)
+                prob_label_diff = ret["probs"] - labels_one_hot
+                prob_label_diff_square = tf.square(prob_label_diff, name='square_diff')
+                loss_sum = tf.reduce_sum(prob_label_diff_square, axis=1, name='loss_sum')
+                ret["loss"] = tf.reduce_mean(loss_sum, axis=0, name='loss')
+            else:
+                raise ValueError('unsupported loss={}'.format(loss_func))
 
         # Configure the Training Op (for TRAIN mode)
         if mode == tf.estimator.ModeKeys.TRAIN:
@@ -217,7 +232,7 @@ class ModelFrame(ABC):
         return ret
 
     def build_graph_(self, key, *,
-                     mode, device='gpu', optimizer=None, seed=None):
+                     mode, device='gpu', optimizer=None, seed=None, loss='cross_entropy'):
         """build the graph in self, and initializing pars with random values
 
         Args:
@@ -230,6 +245,10 @@ class ModelFrame(ABC):
                 - None (means do not build the optimization part)
                 - Callable object returning a tf.train.Optimizer (this is useful to create lr as a variable)
             seed: random seed for graph initialization
+            loss: specify the loss function
+
+        Keyword Args:
+            passed to self.build_graph
         """
         graph = tf.Graph()
         with graph.as_default():
@@ -242,7 +261,7 @@ class ModelFrame(ABC):
                 # generate input placeholders
                 features_ph, labels_ph = utils.get_inputs_ph(input_config=self._input_config_raw, batch_size=None)
                 outputs = self.build_graph(features=features_ph, labels=labels_ph, mode=mode,
-                                           params={'optimizer': optimizer})
+                                           params={'optimizer': optimizer, 'loss': loss})
                 session_config = tf.ConfigProto(allow_soft_placement=True,
                                                 gpu_options=tf.GPUOptions(allow_growth=True))
                 session = tf.Session(config=session_config)
